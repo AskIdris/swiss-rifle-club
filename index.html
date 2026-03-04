@@ -472,22 +472,45 @@
                                 <div v-for="prog in disc.programs.filter(p => p.id === activeProgramPerDisc[disc.id])" :key="prog.id">
 
                                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                                        <div>
-                                            <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Shooter *</label>
-                                            <select v-model="entryShooterPerDisc[disc.id]"
-                                                class="w-full border border-gray-300 rounded-lg px-4 py-2">
-                                                <option value="">Select shooter...</option>
-                                                <optgroup label="Members">
-                                                    <option v-for="s in shooters.filter(s=>s.isMember)" :key="s.id" :value="s.id">
-                                                        {{ s.name }}
-                                                    </option>
-                                                </optgroup>
-                                                <optgroup label="Guests">
-                                                    <option v-for="s in shooters.filter(s=>!s.isMember)" :key="s.id" :value="s.id">
-                                                        {{ s.name }}
-                                                    </option>
-                                                </optgroup>
-                                            </select>
+                                        <div class="relative shooter-search-container">
+                                            <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">
+                                                Shooter * 
+                                                <span class="text-xs font-normal text-gray-400 lowercase">(type to search or add new)</span>
+                                            </label>
+                                            <input 
+                                                type="text"
+                                                v-model="entryShooterSearch[disc.id]"
+                                                @input="handleShooterSearch(disc.id)"
+                                                @focus="showShooterDropdown[disc.id] = true"
+                                                list="shooterList"
+                                                placeholder="Type name or select from list..."
+                                                class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200">
+                                            
+                                            <!-- Dropdown results -->
+                                            <div v-if="showShooterDropdown[disc.id] && filteredShootersForDisc(disc.id).length > 0"
+                                                class="absolute z-20 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                                                <div v-for="s in filteredShootersForDisc(disc.id)" :key="s.id"
+                                                    @click="selectShooter(disc.id, s)"
+                                                    class="px-4 py-2 hover:bg-blue-50 cursor-pointer flex items-center justify-between">
+                                                    <span class="font-medium">{{ s.name }}</span>
+                                                    <span :class="s.isMember ? 'text-green-600 text-xs' : 'text-yellow-600 text-xs'">
+                                                        {{ s.isMember ? 'Member' : 'Guest' }}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- Add new shooter option -->
+                                            <div v-if="showShooterDropdown[disc.id] && entryShooterSearch[disc.id] && 
+                                                !shooters.find(s => s.name.toLowerCase() === entryShooterSearch[disc.id].toLowerCase())"
+                                                class="absolute z-20 w-full mt-1 bg-green-50 border border-green-300 rounded-lg shadow-lg">
+                                                <button @click="quickAddShooter(disc.id, entryShooterSearch[disc.id])"
+                                                    class="w-full px-4 py-3 text-left hover:bg-green-100 flex items-center gap-2">
+                                                    <i class="fas fa-user-plus text-green-600"></i>
+                                                    <span class="font-medium text-green-700">
+                                                        Add new shooter: "{{ entryShooterSearch[disc.id] }}"
+                                                    </span>
+                                                </button>
+                                            </div>
                                         </div>
                                         <div class="flex items-end">
                                             <div class="bg-gray-50 rounded-lg px-4 py-2 text-sm text-gray-600 w-full">
@@ -510,9 +533,10 @@
                                                 <input
                                                     v-model.number="entryShots[disc.id][idx]"
                                                     type="number" :min="0" :max="prog.maxScorePerShot"
-                                                    class="w-12 h-12 border-2 rounded-lg text-center font-bold text-base focus:outline-none focus:ring-2 focus:ring-blue-400"
+                                                    class="w-14 h-12 border-2 rounded-lg text-center font-bold text-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
                                                     :class="getShotInputClass(entryShots[disc.id][idx], prog.maxScorePerShot)"
-                                                    @keydown.enter="focusNext($event)">
+                                                    @keydown.enter="focusNext($event)"
+                                                    style="padding: 0.25rem;">
                                             </div>
                                         </div>
                                     </div>
@@ -1091,10 +1115,10 @@
                                 <select v-model="ammoAllocForm.shooterId" class="w-full border rounded-lg px-3 py-2 mt-1">
                                     <option value="">Select shooter...</option>
                                     <optgroup label="Members">
-                                        <option v-for="s in shooters.filter(s=>s.isMember)" :key="s.id" :value="s.id">{{ s.name }}</option>
+                                        <option v-for="s in shootersMembersSorted" :key="s.id" :value="s.id">{{ s.name }}</option>
                                     </optgroup>
                                     <optgroup label="Guests">
-                                        <option v-for="s in shooters.filter(s=>!s.isMember)" :key="s.id" :value="s.id">{{ s.name }}</option>
+                                        <option v-for="s in shootersGuestsSorted" :key="s.id" :value="s.id">{{ s.name }}</option>
                                     </optgroup>
                                 </select>
                             </div>
@@ -1197,10 +1221,10 @@
                                         class="w-full border rounded-lg px-3 py-2 mt-1">
                                         <option value="">Select shooter...</option>
                                         <optgroup label="Members">
-                                            <option v-for="s in shooters.filter(s=>s.isMember)" :key="s.id" :value="s.id">{{ s.name }}</option>
+                                            <option v-for="s in shootersMembersSorted" :key="s.id" :value="s.id">{{ s.name }}</option>
                                         </optgroup>
                                         <optgroup label="Guests">
-                                            <option v-for="s in shooters.filter(s=>!s.isMember)" :key="s.id" :value="s.id">{{ s.name }}</option>
+                                            <option v-for="s in shootersGuestsSorted" :key="s.id" :value="s.id">{{ s.name }}</option>
                                         </optgroup>
                                     </select>
                                     <!-- Member / Guest badge shown immediately after selection -->
@@ -3270,6 +3294,8 @@
                     openDiscEntries: {},      // { discId: true/false }
                     activeProgramPerDisc: {}, // { discId: progId }
                     entryShooterPerDisc: {},  // { discId: shooterId }
+                    entryShooterSearch: {},   // { discId: "search text" }
+                    showShooterDropdown: {},  // { discId: true/false }
                     entryShots: {},           // { discId: [0,0,...] }
                     shooterForm: {},
                     disciplineForm: {},
@@ -3436,6 +3462,16 @@
                     return list.sort((a,b) => b.date.localeCompare(a.date));
                 },
                 // Count scores saved in current session date
+                shootersSorted() {
+                    // Return shooters sorted alphabetically by name
+                    return [...this.shooters].sort((a, b) => a.name.localeCompare(b.name));
+                },
+                shootersMembersSorted() {
+                    return this.shootersSorted.filter(s => s.isMember);
+                },
+                shootersGuestsSorted() {
+                    return this.shootersSorted.filter(s => !s.isMember);
+                },
                 sessionScoreCount() {
                     return this.scores.filter(s => s.date === this.sessionDate).length;
                 },
@@ -3521,6 +3557,8 @@
                 clearDiscEntry(discId, shotCount) {
                     this.entryShots[discId] = new Array(shotCount).fill(0);
                     this.entryShooterPerDisc[discId] = '';
+                    this.entryShooterSearch[discId] = '';
+                    this.showShooterDropdown[discId] = false;
                 },
                 calcEntryTotal(discId) {
                     const shots = this.entryShots[discId] || [];
@@ -3556,6 +3594,59 @@
                     const inputs = Array.from(document.querySelectorAll('input[type=number]'));
                     const idx = inputs.indexOf(e.target);
                     if (idx >= 0 && idx < inputs.length - 1) inputs[idx + 1].focus();
+                },
+                // Shooter search and add methods
+                filteredShootersForDisc(discId) {
+                    const search = (this.entryShooterSearch[discId] || '').toLowerCase();
+                    if (!search) return this.shootersSorted.slice(0, 10); // Show first 10 if no search
+                    return this.shootersSorted.filter(s => 
+                        s.name.toLowerCase().includes(search)
+                    );
+                },
+                handleShooterSearch(discId) {
+                    this.showShooterDropdown[discId] = true;
+                    // Clear selected shooter if search changes
+                    this.entryShooterPerDisc[discId] = '';
+                },
+                selectShooter(discId, shooter) {
+                    this.entryShooterPerDisc[discId] = shooter.id;
+                    this.entryShooterSearch[discId] = shooter.name;
+                    this.showShooterDropdown[discId] = false;
+                },
+                quickAddShooter(discId, name) {
+                    if (!name || name.trim().length < 2) {
+                        alert('Please enter a valid name (at least 2 characters)');
+                        return;
+                    }
+                    
+                    const isMember = confirm(
+                        `Add "${name}" as a shooter?\n\n` +
+                        `Click OK for MEMBER\n` +
+                        `Click Cancel for GUEST`
+                    );
+                    
+                    const newShooter = {
+                        id: 's' + Date.now().toString().slice(-6),
+                        name: name.trim(),
+                        isMember: isMember,
+                        email: '',
+                        phone: '',
+                        dateOfBirth: '',
+                        membershipNumber: isMember ? 'SRC' + (this.shooters.length + 1).toString().padStart(3, '0') : '',
+                        firearmCertNumber: '',
+                        address: '',
+                        notes: 'Added via quick-add during score entry'
+                    };
+                    
+                    this.shooters.push(newShooter);
+                    this.saveToLocalStorage();
+                    
+                    // Auto-select the new shooter
+                    this.entryShooterPerDisc[discId] = newShooter.id;
+                    this.entryShooterSearch[discId] = newShooter.name;
+                    this.showShooterDropdown[discId] = false;
+                    
+                    alert(`✅ Added ${newShooter.name} as ${isMember ? 'Member' : 'Guest'}!`);
                 },
                 saveDiscScore(disc, prog) {
                     if (!this.sessionDate) { alert('Please set a shoot date first.'); return; }
@@ -3594,7 +3685,7 @@
                 // ─────────────────────────────────────────────────────────
                 loadData() {
                     // Version stamp - if app data version changes, wipe stale cache
-                    const DATA_VERSION = 'v13_event_count_fix';
+                    const DATA_VERSION = 'v15_searchable_shooters';
                     const storedVersion = localStorage.getItem('swiss_data_version');
 
                     if (storedVersion !== DATA_VERSION) {
@@ -4497,10 +4588,6 @@
                     const file = event.target.files[0];
                     if (!file) return;
 
-                    if (!confirm(`Restore from "${file.name}"?\n\nThis will REPLACE all current data with the backup. This cannot be undone.\n\nClick OK to continue.`)) {
-                        return;
-                    }
-
                     const reader = new FileReader();
                     reader.onload = (e) => {
                         try {
@@ -4512,14 +4599,106 @@
                                 return;
                             }
 
-                            // Restore each section if it exists
-                            if (data.shooters)    this.shooters    = data.shooters;
-                            if (data.scores)      this.scores      = data.scores;
-                            if (data.disciplines) this.disciplines = data.disciplines;
-                            if (data.ammoStock)   this.ammoStock   = data.ammoStock;
-                            if (data.ammoUsage)   this.ammoUsage   = data.ammoUsage;
-                            if (data.equipment)   this.equipment   = data.equipment;
-                            if (data.charges)     this.charges     = data.charges;
+                            // Count what's in backup vs current device
+                            const backupCount = {
+                                shooters: data.shooters?.length || 0,
+                                scores: data.scores?.length || 0,
+                                ammo: data.ammoStock?.length || 0,
+                                equipment: data.equipment?.length || 0,
+                                charges: data.charges?.length || 0
+                            };
+                            const currentCount = {
+                                shooters: this.shooters.length,
+                                scores: this.scores.length,
+                                ammo: this.ammoStock.length,
+                                equipment: this.equipment.length,
+                                charges: this.charges.length
+                            };
+
+                            // Offer merge or replace choice
+                            const hasCurrentData = currentCount.shooters > 0 || currentCount.scores > 0;
+                            let mode = 'replace'; // default
+
+                            if (hasCurrentData) {
+                                const choice = confirm(
+                                    `📦 BACKUP RESTORE OPTIONS\n\n` +
+                                    `Backup contains: ${backupCount.shooters} shooters, ${backupCount.scores} scores\n` +
+                                    `This device has: ${currentCount.shooters} shooters, ${currentCount.scores} scores\n\n` +
+                                    `Choose restore mode:\n\n` +
+                                    `✅ OK = MERGE (combine backup + current data)\n` +
+                                    `❌ Cancel = REPLACE (wipe current, use only backup)\n\n` +
+                                    `Recommended: Click OK to MERGE if you've added new data on this device.`
+                                );
+                                mode = choice ? 'merge' : 'replace';
+                            }
+
+                            if (mode === 'replace') {
+                                // REPLACE mode: overwrite everything
+                                if (data.shooters)    this.shooters    = data.shooters;
+                                if (data.scores)      this.scores      = data.scores;
+                                if (data.disciplines) this.disciplines = data.disciplines;
+                                if (data.ammoStock)   this.ammoStock   = data.ammoStock;
+                                if (data.ammoUsage)   this.ammoUsage   = data.ammoUsage;
+                                if (data.equipment)   this.equipment   = data.equipment;
+                                if (data.charges)     this.charges     = data.charges;
+                            } else {
+                                // MERGE mode: combine data intelligently
+                                
+                                // Shooters: merge by ID, keep newer version
+                                if (data.shooters) {
+                                    const shooterMap = {};
+                                    this.shooters.forEach(s => shooterMap[s.id] = s);
+                                    data.shooters.forEach(s => {
+                                        shooterMap[s.id] = s; // backup overwrites if duplicate ID
+                                    });
+                                    this.shooters = Object.values(shooterMap);
+                                }
+
+                                // Scores: merge by ID, avoid duplicates
+                                if (data.scores) {
+                                    const scoreMap = {};
+                                    this.scores.forEach(s => scoreMap[s.id] = s);
+                                    data.scores.forEach(s => {
+                                        scoreMap[s.id] = s;
+                                    });
+                                    this.scores = Object.values(scoreMap);
+                                }
+
+                                // Disciplines: use backup (these should be standard)
+                                if (data.disciplines) this.disciplines = data.disciplines;
+
+                                // Ammo stock: merge by ID
+                                if (data.ammoStock) {
+                                    const ammoMap = {};
+                                    this.ammoStock.forEach(a => ammoMap[a.id] = a);
+                                    data.ammoStock.forEach(a => ammoMap[a.id] = a);
+                                    this.ammoStock = Object.values(ammoMap);
+                                }
+
+                                // Ammo usage: merge by ID
+                                if (data.ammoUsage) {
+                                    const usageMap = {};
+                                    this.ammoUsage.forEach(u => usageMap[u.id] = u);
+                                    data.ammoUsage.forEach(u => usageMap[u.id] = u);
+                                    this.ammoUsage = Object.values(usageMap);
+                                }
+
+                                // Equipment: merge by ID
+                                if (data.equipment) {
+                                    const equipMap = {};
+                                    this.equipment.forEach(e => equipMap[e.id] = e);
+                                    data.equipment.forEach(e => equipMap[e.id] = e);
+                                    this.equipment = Object.values(equipMap);
+                                }
+
+                                // Charges: merge by ID
+                                if (data.charges) {
+                                    const chargeMap = {};
+                                    this.charges.forEach(c => chargeMap[c.id] = c);
+                                    data.charges.forEach(c => chargeMap[c.id] = c);
+                                    this.charges = Object.values(chargeMap);
+                                }
+                            }
 
                             this.saveToLocalStorage();
 
@@ -4527,7 +4706,15 @@
                                 ? new Date(data.exportDate).toLocaleString()
                                 : 'Unknown date';
 
-                            alert(`✅ Restore successful!\n\nBackup from: ${exportDate}\n\nRestored:\n• ${data.shooters?.length || 0} shooters\n• ${data.scores?.length || 0} scores\n• ${data.disciplines?.length || 0} disciplines`);
+                            alert(
+                                `✅ ${mode === 'merge' ? 'MERGE' : 'REPLACE'} successful!\n\n` +
+                                `Backup from: ${exportDate}\n\n` +
+                                `Final counts:\n` +
+                                `• ${this.shooters.length} shooters\n` +
+                                `• ${this.scores.length} scores\n` +
+                                `• ${this.disciplines.length} disciplines\n` +
+                                `• ${this.charges.length} payment records`
+                            );
 
                         } catch (err) {
                             alert('❌ Failed to read backup file. Make sure it is a valid JSON backup.');
