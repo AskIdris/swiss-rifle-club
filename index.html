@@ -473,17 +473,23 @@
 
                                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                                         <div>
-                                            <label class="block text-xs font-semibold text-gray-500 uppercase mb-1">Shooter *</label>
+                                            <div class="flex items-center justify-between mb-1">
+                                                <label class="block text-xs font-semibold text-gray-500 uppercase">Shooter *</label>
+                                                <button @click="openQuickAddModal(disc.id)" type="button"
+                                                    class="text-xs text-green-600 hover:text-green-700 font-semibold flex items-center gap-1">
+                                                    <i class="fas fa-user-plus"></i> Add New
+                                                </button>
+                                            </div>
                                             <select v-model="entryShooterPerDisc[disc.id]"
                                                 class="w-full border border-gray-300 rounded-lg px-4 py-2">
                                                 <option value="">Select shooter...</option>
                                                 <optgroup label="Members">
-                                                    <option v-for="s in shooters.filter(s=>s.isMember)" :key="s.id" :value="s.id">
+                                                    <option v-for="s in shootersMembersSorted" :key="s.id" :value="s.id">
                                                         {{ s.name }}
                                                     </option>
                                                 </optgroup>
                                                 <optgroup label="Guests">
-                                                    <option v-for="s in shooters.filter(s=>!s.isMember)" :key="s.id" :value="s.id">
+                                                    <option v-for="s in shootersGuestsSorted" :key="s.id" :value="s.id">
                                                         {{ s.name }}
                                                     </option>
                                                 </optgroup>
@@ -510,7 +516,8 @@
                                                 <input
                                                     v-model.number="entryShots[disc.id][idx]"
                                                     type="number" :min="0" :max="prog.maxScorePerShot"
-                                                    class="w-12 h-12 border-2 rounded-lg text-center font-bold text-base focus:outline-none focus:ring-2 focus:ring-blue-400"
+                                                    class="w-16 h-14 border-2 rounded-lg text-center font-bold text-xl focus:outline-none focus:ring-2 focus:ring-blue-400"
+                                                    style="padding: 0.5rem;"
                                                     :class="getShotInputClass(entryShots[disc.id][idx], prog.maxScorePerShot)"
                                                     @keydown.enter="focusNext($event)">
                                             </div>
@@ -630,7 +637,7 @@
                                         :class="idx % 2 === 0 ? 'bg-white hover:bg-blue-50' : 'bg-gray-50 hover:bg-blue-50'">
                                         <td class="px-4 py-3 text-center font-bold text-gray-500">{{ idx + 1 }}</td>
                                         <td class="px-4 py-3 font-semibold">
-                                            {{ getShooterName(row.shooterId) }}
+                                            {{ row.shooterName }}
                                             <span v-if="!getShooterObj(row.shooterId)" class="text-xs text-gray-400 ml-1">(guest)</span>
                                         </td>
                                         <td v-for="(shot, si) in row.shots" :key="si"
@@ -1091,10 +1098,10 @@
                                 <select v-model="ammoAllocForm.shooterId" class="w-full border rounded-lg px-3 py-2 mt-1">
                                     <option value="">Select shooter...</option>
                                     <optgroup label="Members">
-                                        <option v-for="s in shooters.filter(s=>s.isMember)" :key="s.id" :value="s.id">{{ s.name }}</option>
+                                        <option v-for="s in shootersMembersSorted" :key="s.id" :value="s.id">{{ s.name }}</option>
                                     </optgroup>
                                     <optgroup label="Guests">
-                                        <option v-for="s in shooters.filter(s=>!s.isMember)" :key="s.id" :value="s.id">{{ s.name }}</option>
+                                        <option v-for="s in shootersGuestsSorted" :key="s.id" :value="s.id">{{ s.name }}</option>
                                     </optgroup>
                                 </select>
                             </div>
@@ -1197,10 +1204,10 @@
                                         class="w-full border rounded-lg px-3 py-2 mt-1">
                                         <option value="">Select shooter...</option>
                                         <optgroup label="Members">
-                                            <option v-for="s in shooters.filter(s=>s.isMember)" :key="s.id" :value="s.id">{{ s.name }}</option>
+                                            <option v-for="s in shootersMembersSorted" :key="s.id" :value="s.id">{{ s.name }}</option>
                                         </optgroup>
                                         <optgroup label="Guests">
-                                            <option v-for="s in shooters.filter(s=>!s.isMember)" :key="s.id" :value="s.id">{{ s.name }}</option>
+                                            <option v-for="s in shootersGuestsSorted" :key="s.id" :value="s.id">{{ s.name }}</option>
                                         </optgroup>
                                     </select>
                                     <!-- Member / Guest badge shown immediately after selection -->
@@ -1350,6 +1357,48 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Quick Add Shooter Modal -->
+                <div v-if="showQuickAddModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div class="bg-white rounded-xl p-6 w-full max-w-md">
+                        <h3 class="text-lg font-bold mb-4">Quick Add Shooter</h3>
+                        <div class="space-y-3">
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-600 mb-1">Full Name *</label>
+                                <input v-model="quickAddForm.name" type="text" 
+                                    class="w-full border border-gray-300 rounded-lg px-4 py-2"
+                                    placeholder="e.g. John Smith"
+                                    @keydown.enter="saveQuickAdd">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-600 mb-1">Status *</label>
+                                <div class="flex gap-3">
+                                    <label class="flex-1 flex items-center justify-center gap-2 border-2 rounded-lg p-3 cursor-pointer"
+                                        :class="quickAddForm.isMember ? 'border-green-500 bg-green-50' : 'border-gray-300'">
+                                        <input type="radio" v-model="quickAddForm.isMember" :value="true">
+                                        <span class="font-medium">Member</span>
+                                    </label>
+                                    <label class="flex-1 flex items-center justify-center gap-2 border-2 rounded-lg p-3 cursor-pointer"
+                                        :class="!quickAddForm.isMember ? 'border-yellow-500 bg-yellow-50' : 'border-gray-300'">
+                                        <input type="radio" v-model="quickAddForm.isMember" :value="false">
+                                        <span class="font-medium">Guest</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex gap-3 mt-5">
+                            <button @click="saveQuickAdd" 
+                                class="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg font-semibold">
+                                <i class="fas fa-check mr-1"></i> Add Shooter
+                            </button>
+                            <button @click="showQuickAddModal=false" 
+                                class="px-5 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
             </main>
 
             <!-- Modals -->
@@ -3245,6 +3294,9 @@
                     // ── Payments / Charges ─────────────────────────────────
                     charges: [],          // { id, shooterId, shooterName, date, rangeFee, ammoCharge, otherCharge, otherDesc, total, paid, paymentMethod, paymentRef, notes }
                     showChargeModal: false,
+                    showQuickAddModal: false,
+                    quickAddForm: { name: '', isMember: true },
+                    quickAddTargetDisc: '',
                     editingCharge: null,
                     chargeForm: {},
                     paymentFilterDate: '',
@@ -3436,6 +3488,15 @@
                     return list.sort((a,b) => b.date.localeCompare(a.date));
                 },
                 // Count scores saved in current session date
+                shootersSorted() {
+                    return [...this.shooters].sort((a, b) => a.name.localeCompare(b.name));
+                },
+                shootersMembersSorted() {
+                    return this.shootersSorted.filter(s => s.isMember);
+                },
+                shootersGuestsSorted() {
+                    return this.shootersSorted.filter(s => !s.isMember);
+                },
                 sessionScoreCount() {
                     return this.scores.filter(s => s.date === this.sessionDate).length;
                 },
@@ -3557,6 +3618,48 @@
                     const idx = inputs.indexOf(e.target);
                     if (idx >= 0 && idx < inputs.length - 1) inputs[idx + 1].focus();
                 },
+                // Quick-add shooter methods
+                openQuickAddModal(discId) {
+                    this.quickAddTargetDisc = discId;
+                    this.quickAddForm = { name: '', isMember: true };
+                    this.showQuickAddModal = true;
+                },
+                saveQuickAdd() {
+                    const name = this.quickAddForm.name.trim();
+                    if (!name || name.length < 2) {
+                        alert('Please enter a valid name (at least 2 characters)');
+                        return;
+                    }
+                    
+                    if (this.shooters.find(s => s.name.toLowerCase() === name.toLowerCase())) {
+                        alert('A shooter with this name already exists!');
+                        return;
+                    }
+                    
+                    const newShooter = {
+                        id: 's' + Date.now().toString().slice(-6),
+                        name: name,
+                        isMember: this.quickAddForm.isMember,
+                        email: '',
+                        phone: '',
+                        dateOfBirth: '',
+                        membershipNumber: this.quickAddForm.isMember ? 
+                            'SRC' + (this.shooters.length + 1).toString().padStart(3, '0') : '',
+                        firearmCertNumber: '',
+                        address: '',
+                        notes: 'Added via quick-add'
+                    };
+                    
+                    this.shooters.push(newShooter);
+                    this.saveToLocalStorage();
+                    
+                    if (this.quickAddTargetDisc) {
+                        this.entryShooterPerDisc[this.quickAddTargetDisc] = newShooter.id;
+                    }
+                    
+                    this.showQuickAddModal = false;
+                    alert(`✅ Added ${newShooter.name} as ${newShooter.isMember ? 'Member' : 'Guest'}!`);
+                },
                 saveDiscScore(disc, prog) {
                     if (!this.sessionDate) { alert('Please set a shoot date first.'); return; }
                     const shooterId = this.entryShooterPerDisc[disc.id];
@@ -3594,7 +3697,7 @@
                 // ─────────────────────────────────────────────────────────
                 loadData() {
                     // Version stamp - if app data version changes, wipe stale cache
-                    const DATA_VERSION = 'v16_live_names_simple';
+                    const DATA_VERSION = 'v17_complete_final';
                     const storedVersion = localStorage.getItem('swiss_data_version');
 
                     if (storedVersion !== DATA_VERSION) {
